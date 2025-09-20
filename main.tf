@@ -128,6 +128,8 @@ resource "aws_instance" "web" {
               chown -R ubuntu:ubuntu /home/ubuntu/my-mern
               cd my-mern
               echo 'MONGODB_URI=mongodb://mongodb:27017' > .env
+              echo "FRONTEND_URL=http://$(curl -s http://169.254.169.254/latest/meta-data/public-ipv4):5173" >> .env
+              echo "VITE_API_URL=http://$(curl -s http://169.254.169.254/latest/meta-data/public-ipv4):5050" > mern/frontend/.env.production
               sudo -u ubuntu docker-compose up -d
               EOF
 
