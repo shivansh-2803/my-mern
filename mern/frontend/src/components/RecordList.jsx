@@ -41,7 +41,8 @@ export default function RecordList() {
   // This method fetches the records from the database.
   useEffect(() => {
     async function getRecords() {
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/record/`);
+      const apiUrl = import.meta.env.VITE_API_URL || `http://${window.location.hostname}:5050`;
+      const response = await fetch(`${apiUrl}/record/`);
       if (!response.ok) {
         const message = `An error occurred: ${response.statusText}`;
         console.error(message);
@@ -52,11 +53,12 @@ export default function RecordList() {
     }
     getRecords();
     return;
-  }, [records.length]);
+  }, []);
 
   // This method will delete a record
   async function deleteRecord(id) {
-    await fetch(`${import.meta.env.VITE_API_URL}/record/${id}`, {
+    const apiUrl = import.meta.env.VITE_API_URL || `http://${window.location.hostname}:5050`;
+    await fetch(`${apiUrl}/record/${id}`, {
       method: "DELETE",
     });
     const newRecords = records.filter((el) => el._id !== id);

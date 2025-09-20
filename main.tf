@@ -127,9 +127,11 @@ resource "aws_instance" "web" {
               mkdir -p /home/ubuntu/my-mern/db_data
               chown -R ubuntu:ubuntu /home/ubuntu/my-mern
               cd my-mern
+              PUBLIC_IP=$(curl -s http://169.254.169.254/latest/meta-data/public-ipv4)
               echo 'MONGODB_URI=mongodb://mongodb:27017' > .env
-              echo "FRONTEND_URL=http://$(curl -s http://169.254.169.254/latest/meta-data/public-ipv4):5173" >> .env
-              echo "VITE_API_URL=http://$(curl -s http://169.254.169.254/latest/meta-data/public-ipv4):5050" > mern/frontend/.env.production
+              echo "FRONTEND_URL=http://$PUBLIC_IP:5173" >> .env
+              echo "CORS_ORIGIN=http://$PUBLIC_IP:5173" >> .env
+              echo "VITE_API_URL=http://$PUBLIC_IP:5050" > mern/frontend/.env.production
               sudo -u ubuntu docker-compose up -d
               EOF
 
