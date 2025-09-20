@@ -123,10 +123,10 @@ resource "aws_instance" "web" {
               
               # Clone and start the application
               cd /home/ubuntu
-              git clone https://github.com/iam-veeramalla/MERN-docker-compose.git
-              mkdir -p /home/ubuntu/mongodb_data
-              chown -R ubuntu:ubuntu /home/ubuntu/MERN-docker-compose /home/ubuntu/mongodb_data
-              cd MERN-docker-compose
+              git clone https://github.com/shivansh-2803/my-mern.git
+              chown -R ubuntu:ubuntu /home/ubuntu/my-mern
+              cd my-mern
+              echo 'MONGODB_URI=mongodb+srv://<username>:<password>@cluster0.xxxxx.mongodb.net/<database>?retryWrites=true&w=majority' > .env
               sudo -u ubuntu docker-compose up -d
               EOF
 
