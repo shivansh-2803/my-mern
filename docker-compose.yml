@@ -5,7 +5,7 @@ services:
     ports:
       - "27017:27017"
     volumes:
-      - mongodb_data:/data/db
+      - ./db_data:/data/db
 
   backend:
     build: ./mern/backend
@@ -26,6 +26,4 @@ services:
     depends_on:
       - backend
 
-volumes:
-  mongodb_data:
 
