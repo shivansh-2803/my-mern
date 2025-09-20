@@ -1,12 +1,22 @@
 services:
+  mongodb:
+    image: mongo:7.0
+    container_name: mongodb
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodb_data:/data/db
+
   backend:
     build: ./mern/backend
     container_name: backend
     ports:
       - "5050:5050"
+    depends_on:
+      - mongodb
     environment:
       - PORT=5050
-      - MONGODB_URI=${MONGODB_URI}
+      - MONGODB_URI=mongodb://mongodb:27017
 
   frontend:
     build: ./mern/frontend
@@ -15,4 +25,7 @@ services:
       - "5173:5173"
     depends_on:
       - backend
+
+volumes:
+  mongodb_data:
 
