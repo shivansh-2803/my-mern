@@ -1,0 +1,65 @@
+replicaCount:
+  frontend: 2
+  backend: 2
+
+image:
+  registry: your-registry
+  frontend:
+    repository: mern-frontend
+    tag: latest
+  backend:
+    repository: mern-backend
+    tag: latest
+
+service:
+  type: ClusterIP
+  frontend:
+    port: 80
+    targetPort: 5173
+  backend:
+    port: 5050
+    targetPort: 5050
+
+ingress:
+  enabled: true
+  className: "nginx"
+  annotations:
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+  hosts:
+    - host: unconvensionalweb.com
+      paths:
+        - path: /
+          pathType: Prefix
+          service: frontend
+    - host: api.unconvensionalweb.com
+      paths:
+        - path: /
+          pathType: Prefix
+          service: backend
+  tls:
+    - secretName: mern-tls
+      hosts:
+        - unconvensionalweb.com
+        - api.unconvensionalweb.com
+
+mongodb:
+  enabled: true
+  persistence:
+    size: 5Gi
+
+resources:
+  frontend:
+    limits:
+      cpu: 500m
+      memory: 512Mi
+    requests:
+      cpu: 250m
+      memory: 256Mi
+  backend:
+    limits:
+      cpu: 500m
+      memory: 512Mi
+    requests:
+      cpu: 250m
+      memory: 256Mi
