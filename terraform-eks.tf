@@ -23,30 +23,11 @@ resource "aws_subnet" "private" {
   }
 }
 
-resource "aws_eks_node_group" "mern_nodes" {
-  cluster_name    = aws_eks_cluster.mern_cluster.name
-  node_group_name = "mern-nodes"
-  node_role_arn   = aws_iam_role.eks_node.arn
-  subnet_ids      = [aws_subnet.private.id]
-
-  scaling_config {
-    desired_size = 2
-    max_size     = 4
-    min_size     = 1
-  }
-
-  instance_types = ["t3.medium"]
-
-  depends_on = [
-    aws_iam_role_policy_attachment.eks_worker_node_policy,
-    aws_iam_role_policy_attachment.eks_cni_policy,
-    aws_iam_role_policy_attachment.eks_container_registry_policy,
-  ]
-}
+# Removed slow node group - using Fargate instead
 
 # IAM roles for EKS
 resource "aws_iam_role" "eks_cluster" {
-  name = "eks-cluster-role"
+  name = "eks-cluster-role-mern"
 
   assume_role_policy = jsonencode({
     Statement = [{
@@ -65,35 +46,7 @@ resource "aws_iam_role_policy_attachment" "eks_cluster_policy" {
   role       = aws_iam_role.eks_cluster.name
 }
 
-resource "aws_iam_role" "eks_node" {
-  name = "eks-node-role"
-
-  assume_role_policy = jsonencode({
-    Statement = [{
-      Action = "sts:AssumeRole"
-      Effect = "Allow"
-      Principal = {
-        Service = "ec2.amazonaws.com"
-      }
-    }]
-    Version = "2012-10-17"
-  })
-}
-
-resource "aws_iam_role_policy_attachment" "eks_worker_node_policy" {
-  policy_arn = "arn:aws:iam::aws:policy/AmazonEKSWorkerNodePolicy"
-  role       = aws_iam_role.eks_node.name
-}
-
-resource "aws_iam_role_policy_attachment" "eks_cni_policy" {
-  policy_arn = "arn:aws:iam::aws:policy/AmazonEKS_CNI_Policy"
-  role       = aws_iam_role.eks_node.name
-}
-
-resource "aws_iam_role_policy_attachment" "eks_container_registry_policy" {
-  policy_arn = "arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly"
-  role       = aws_iam_role.eks_node.name
-}
+# Node group IAM roles removed - using Fargate
 
 output "eks_cluster_endpoint" {
   value = aws_eks_cluster.mern_cluster.endpoint

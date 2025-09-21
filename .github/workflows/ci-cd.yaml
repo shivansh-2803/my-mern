@@ -75,6 +75,15 @@ jobs:
         aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
         aws-region: ${{ secrets.AWS_REGION }}
 
+    - name: Check if EKS cluster exists
+      run: |
+        if ! aws eks describe-cluster --region ${{ secrets.AWS_REGION }} --name ${{ secrets.EKS_CLUSTER_NAME }} > /dev/null 2>&1; then
+          echo "❌ EKS cluster '${{ secrets.EKS_CLUSTER_NAME }}' not found in region '${{ secrets.AWS_REGION }}'"
+          echo "Please create the cluster first using: terraform apply"
+          exit 1
+        fi
+        echo "✅ EKS cluster found"
+
     - name: Update kubeconfig for EKS
       run: |
         aws eks update-kubeconfig --region ${{ secrets.AWS_REGION }} --name ${{ secrets.EKS_CLUSTER_NAME }}

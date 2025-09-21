@@ -42,7 +42,7 @@ Complete step-by-step guide to deploy your MERN application to AWS EKS with CI/C
 # Edit k8s/cert-manager.yaml - replace 'your-email@domain.com' with your email
 ```
 
-#### Deploy EKS Cluster
+#### Deploy EKS Cluster (REQUIRED FIRST)
 ```bash
 # Initialize Terraform
 terraform init
@@ -51,10 +51,15 @@ terraform init
 terraform apply -target=aws_eks_cluster.mern_cluster
 terraform apply -target=aws_eks_node_group.mern_nodes
 
+# Verify cluster is created
+aws eks describe-cluster --region us-east-1 --name mern-cluster
+
 # Get cluster info
 terraform output eks_cluster_name
 terraform output eks_cluster_endpoint
 ```
+
+⚠️ **IMPORTANT**: The EKS cluster MUST be created before GitHub Actions can deploy to it.
 
 ### 3. GitHub Setup
 
