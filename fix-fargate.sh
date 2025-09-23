@@ -13,3 +13,4 @@ kubectl apply -f k8s/
 
 echo "✅ Redeployed without persistent volumes"
 echo "📊 Check status: kubectl get pods -n mern-app"
+#

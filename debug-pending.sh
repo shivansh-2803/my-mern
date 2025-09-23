@@ -15,3 +15,4 @@ echo "📋 Common fixes:"
 echo "1. Check if Fargate profile exists and matches namespace"
 echo "2. Verify subnet configuration"
 echo "3. Check resource limits"
+#

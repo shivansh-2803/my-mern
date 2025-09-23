@@ -17,3 +17,4 @@ kubectl get svc -n mern-app
 echo "🌐 LoadBalancer URL:"
 kubectl get svc frontend -n mern-app -o jsonpath='{.status.loadBalancer.ingress[0].hostname}'
 echo ""
+#
