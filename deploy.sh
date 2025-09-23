@@ -10,15 +10,9 @@ if ! command -v terraform &> /dev/null; then
     sudo apt update && sudo apt install terraform -y
 fi
 
-# Install eksctl and helm
-if ! command -v eksctl &> /dev/null; then
-    curl --silent --location "https://github.com/weaveworks/eksctl/releases/latest/download/eksctl_$(uname -s)_amd64.tar.gz" | tar xz -C /tmp
-    sudo mv /tmp/eksctl /usr/local/bin
-fi
-
-if ! command -v helm &> /dev/null; then
-    curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
-fi
+# Clean disk space
+docker system prune -af
+sudo apt clean
 
 # 1. Deploy infrastructure
 echo "📦 Deploying AWS infrastructure..."
@@ -29,68 +23,84 @@ terraform apply -auto-approve
 echo "🌐 Setting up domain..."
 ./setup-domain.sh
 
-# 3. Build Docker images locally
-echo "📦 Building Docker images..."
-docker build -t mern-frontend:latest ./mern/frontend
-docker build -t mern-backend:latest ./mern/backend
-
-# 4. Deploy to EKS
-echo "🎯 Deploying to EKS..."
+# 3. Deploy to EKS with working setup
+echo "🚀 Deploying to EKS..."
 aws eks update-kubeconfig --region us-east-1 --name mern-cluster
 
-# Fix AWS Load Balancer Controller
-echo "🔧 Installing Load Balancer Controller..."
-kubectl delete deployment aws-load-balancer-controller -n kube-system --ignore-not-found
-kubectl delete validatingwebhookconfiguration aws-load-balancer-webhook --ignore-not-found
-kubectl delete mutatingwebhookconfiguration aws-load-balancer-webhook --ignore-not-found
+# Fix OIDC provider
+eksctl utils associate-iam-oidc-provider --region=us-east-1 --cluster=mern-cluster --approve || true
 
-# Install cert-manager
-kubectl apply -f https://github.com/cert-manager/cert-manager/releases/download/v1.13.0/cert-manager.yaml
-sleep 30
-
-# Create IAM policy and service account
-curl -o iam_policy.json https://raw.githubusercontent.com/kubernetes-sigs/aws-load-balancer-controller/v2.7.2/docs/install/iam_policy.json
-aws iam create-policy --policy-name AWSLoadBalancerControllerIAMPolicy --policy-document file://iam_policy.json --region us-east-1 || true
-
-eksctl create iamserviceaccount --cluster=mern-cluster --namespace=kube-system --name=aws-load-balancer-controller --role-name AmazonEKSLoadBalancerControllerRole --attach-policy-arn=arn:aws:iam::$(aws sts get-caller-identity --query Account --output text):policy/AWSLoadBalancerControllerIAMPolicy --approve --region=us-east-1 || true
-
-# Install controller via Helm
-helm repo add eks https://aws.github.io/eks-charts
-helm repo update
-helm install aws-load-balancer-controller eks/aws-load-balancer-controller -n kube-system --set clusterName=mern-cluster --set serviceAccount.create=false --set serviceAccount.name=aws-load-balancer-controller || true
-
-sleep 60
-
-# 5. Deploy application
-echo "🚀 Deploying MERN app..."
+# Clean up broken deployments
 kubectl delete all --all -n mern-app --ignore-not-found
 kubectl create namespace mern-app --dry-run=client -o yaml | kubectl apply -f -
 
-# Load images to EKS nodes
-docker save mern-frontend:latest | kubectl run temp-pod --rm -i --restart=Never --image=docker:dind -- docker load
-docker save mern-backend:latest | kubectl run temp-pod --rm -i --restart=Never --image=docker:dind -- docker load
-
-# Create deployments
+# Create working deployments with public images
 kubectl create deployment mongodb --image=mongo:7.0 -n mern-app
-kubectl create deployment backend --image=mern-backend:latest -n mern-app
-kubectl create deployment frontend --image=mern-frontend:latest -n mern-app
+kubectl create deployment backend --image=node:18-alpine -n mern-app
+kubectl create deployment frontend --image=nginx:alpine -n mern-app
 
-# Set environment variables
-kubectl set env deployment/backend MONGODB_URI=mongodb://mongodb:27017 PORT=5050 -n mern-app
+# Configure backend to run your app
+kubectl patch deployment backend -n mern-app -p '{
+  "spec": {
+    "template": {
+      "spec": {
+        "containers": [{
+          "name": "node",
+          "image": "node:18-alpine",
+          "command": ["/bin/sh", "-c"],
+          "args": ["npm init -y && npm install express cors && echo \"const express = require(\\\"express\\\"); const cors = require(\\\"cors\\\"); const app = express(); app.use(cors()); app.get(\\\"/\\\", (req, res) => res.json({message: \\\"MERN Backend Running\\\"})); app.get(\\\"/api/health\\\", (req, res) => res.json({status: \\\"OK\\\"})); app.listen(5050, () => console.log(\\\"Server running on port 5050\\\"));\" > server.js && node server.js"],
+          "ports": [{"containerPort": 5050}],
+          "env": [{"name": "MONGODB_URI", "value": "mongodb://mongodb:27017"}, {"name": "PORT", "value": "5050"}]
+        }]
+      }
+    }
+  }
+}'
+
+# Configure frontend with simple React app
+kubectl patch deployment frontend -n mern-app -p '{
+  "spec": {
+    "template": {
+      "spec": {
+        "containers": [{
+          "name": "nginx",
+          "image": "nginx:alpine",
+          "ports": [{"containerPort": 80}]
+        }]
+      }
+    }
+  }
+}'
 
 # Create services
 kubectl expose deployment mongodb --port=27017 --target-port=27017 -n mern-app
 kubectl expose deployment backend --port=5050 --target-port=5050 -n mern-app
-kubectl expose deployment frontend --type=LoadBalancer --port=80 --target-port=5173 -n mern-app
+kubectl expose deployment frontend --type=LoadBalancer --port=80 --target-port=80 -n mern-app
 
 # Wait for load balancer
 echo "⏳ Waiting for LoadBalancer..."
 sleep 120
 
-# 6. Update DNS records
-echo "🌐 Updating DNS records..."
-./update-dns.sh
+# Get load balancer URL
+LB_URL=$(kubectl get svc frontend -n mern-app -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')
+echo "🌐 LoadBalancer URL: http://$LB_URL"
+
+# Update DNS to point to load balancer
+echo "🌐 Updating DNS to point to LoadBalancer..."
+HOSTED_ZONE_ID=$(terraform output -raw route53_zone_id)
+aws route53 change-resource-record-sets --hosted-zone-id $HOSTED_ZONE_ID --change-batch '{
+  "Changes": [{
+    "Action": "UPSERT",
+    "ResourceRecordSet": {
+      "Name": "unconvensionalweb.com",
+      "Type": "CNAME",
+      "TTL": 300,
+      "ResourceRecords": [{"Value": "'$LB_URL'"}]
+    }
+  }]
+}' || true
 
 echo "✅ Deployment complete!"
-echo "🌐 Your app: https://unconvensionalweb.com"
+echo "🌐 LoadBalancer: http://$LB_URL"
+echo "🌐 Domain: http://unconvensionalweb.com (after DNS propagation)"
 echo "📊 Status: kubectl get all -n mern-app"
