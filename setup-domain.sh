@@ -2,11 +2,12 @@
 
 echo "🌐 Setting up Route 53 domain..."
 
-# Deploy Route 53 resources
+# Deploy Route 53 and Fargate resources
 terraform apply -target=aws_route53_zone.main
 terraform apply -target=aws_acm_certificate.ssl_cert
 terraform apply -target=aws_route53_record.cert_validation
 terraform apply -target=aws_acm_certificate_validation.ssl_cert
+terraform apply -target=aws_eks_fargate_profile.mern_fargate
 
 # Get name servers
 echo "📋 Update your domain registrar with these name servers:"

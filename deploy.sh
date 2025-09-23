@@ -15,5 +15,9 @@ echo "🌐 Setting up domain..."
 echo "🎯 Deploying application..."
 ./quick-deploy.sh
 
+# 4. Update DNS records
+echo "🌐 Updating DNS records..."
+./update-dns.sh
+
 echo "✅ Deployment complete!"
 echo "🌐 Your app: https://unconvensionalweb.com"

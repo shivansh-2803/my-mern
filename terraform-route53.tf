@@ -46,40 +46,9 @@ resource "aws_acm_certificate_validation" "ssl_cert" {
   validation_record_fqdns = [for record in aws_route53_record.cert_validation : record.fqdn]
 }
 
-# Data source to get ALB DNS name (will be created by Kubernetes)
-data "kubernetes_service" "frontend_lb" {
-  metadata {
-    name      = "frontend"
-    namespace = "mern-app"
-  }
-  depends_on = [null_resource.wait_for_lb]
-}
-
-# Wait for load balancer to be created
-resource "null_resource" "wait_for_lb" {
-  provisioner "local-exec" {
-    command = "kubectl wait --for=condition=available --timeout=300s deployment/frontend -n mern-app || true"
-  }
-  depends_on = [aws_eks_cluster.mern_cluster]
-}
-
-# Main domain record
-resource "aws_route53_record" "main" {
-  zone_id = aws_route53_zone.main.zone_id
-  name    = "unconvensionalweb.com"
-  type    = "CNAME"
-  ttl     = 300
-  records = [data.kubernetes_service.frontend_lb.status.0.load_balancer.0.ingress.0.hostname]
-}
-
-# API subdomain record
-resource "aws_route53_record" "api" {
-  zone_id = aws_route53_zone.main.zone_id
-  name    = "api.unconvensionalweb.com"
-  type    = "CNAME"
-  ttl     = 300
-  records = [data.kubernetes_service.frontend_lb.status.0.load_balancer.0.ingress.0.hostname]
-}
+# DNS records will be created manually after getting load balancer DNS
+# Run: kubectl get svc frontend -n mern-app
+# Then update DNS records in Route 53 console or via CLI
 
 # Outputs
 output "route53_zone_id" {
