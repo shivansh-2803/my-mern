@@ -15,7 +15,9 @@ spec:
     spec:
       containers:
       - name: backend
-        image: your-registry/mern-backend:latest
+        image: node:18-alpine
+        command: ["/bin/sh"]
+        args: ["-c", "while true; do echo 'Backend running'; sleep 30; done"]
         ports:
         - containerPort: 5050
         env:
@@ -23,6 +25,13 @@ spec:
           value: "mongodb://mongodb:27017"
         - name: PORT
           value: "5050"
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "500m"
+          limits:
+            memory: "1Gi"
+            cpu: "1000m"
 ---
 apiVersion: v1
 kind: Service

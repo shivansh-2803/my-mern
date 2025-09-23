@@ -114,12 +114,18 @@ resource "aws_instance" "web" {
   user_data = <<-EOF
               #!/bin/bash
               apt update -y
-              apt install -y docker.io git
+              apt install -y docker.io git snapd
               systemctl start docker
               systemctl enable docker
               usermod -a -G docker ubuntu
               curl -L "https://github.com/docker/compose/releases/download/v2.20.2/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
               chmod +x /usr/local/bin/docker-compose
+              
+              # Install AWS CLI and kubectl
+              snap install aws-cli --classic
+              curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+              chmod +x kubectl
+              mv kubectl /usr/local/bin/
               
               # Clone and start the application
               cd /home/ubuntu

@@ -15,9 +15,16 @@ spec:
     spec:
       containers:
       - name: frontend
-        image: your-registry/mern-frontend:latest
+        image: nginx:alpine
         ports:
         - containerPort: 5173
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "250m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
 ---
 apiVersion: v1
 kind: Service

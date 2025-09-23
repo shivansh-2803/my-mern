@@ -29,7 +29,6 @@ kubectl get svc frontend -n mern-app
 │   └── backend/      # Express API + MongoDB
 ├── k8s/              # Kubernetes manifests
 ├── helm/             # Helm charts
-├── ansible/          # Automation playbooks
 ├── .github/          # CI/CD workflows
 ├── terraform-eks.tf # EKS infrastructure
 └── main.tf          # AWS infrastructure
@@ -40,7 +39,7 @@ kubectl get svc frontend -n mern-app
 - **Backend**: Node.js, Express, MongoDB
 - **Infrastructure**: AWS EKS, Fargate, ALB
 - **CI/CD**: GitHub Actions, Helm
-- **Automation**: Ansible, Terraform
+- **Automation**: Terraform
 
 ## 📋 Complete Setup Guide
 
@@ -68,107 +67,45 @@ kubectl get svc frontend -n mern-app
 # Save: Access Key ID and Secret Access Key
 ```
 
-### 2. Deploy Infrastructure
+### 2. Complete Deployment
 
-#### Configure AWS CLI
+#### One-Command Deploy
 ```bash
+# Configure AWS CLI first
 aws configure
-# Enter your Access Key ID and Secret Access Key
-# Region: us-east-1
+
+# Deploy everything
+chmod +x deploy.sh
+./deploy.sh
 ```
 
-#### Deploy with Terraform
+#### Manual Steps (if needed)
 ```bash
-# Initialize and deploy
-terraform init
+# 1. Infrastructure
 terraform apply
 
-# Verify EKS cluster
-aws eks describe-cluster --name mern-cluster --region us-east-1
-```
+# 2. Domain
+./setup-domain.sh
 
-### 3. Deploy Application
-
-#### Option A: Quick Deploy (Recommended)
-```bash
-# SSH to your EC2 instance or run locally
-chmod +x quick-deploy.sh
+# 3. Application
 ./quick-deploy.sh
-
-# Check deployment
-kubectl get pods -n mern-app
-kubectl get svc -n mern-app
 ```
 
-#### Option B: Ansible Automation
+### 3. GitHub CI/CD (Optional)
+
+#### Add Secrets and Push
 ```bash
-chmod +x deploy-with-ansible.sh
-./deploy-with-ansible.sh
-```
-
-#### Option C: Manual Kubernetes
-```bash
-kubectl apply -f k8s/
-```
-
-### 4. GitHub CI/CD Setup
-
-#### Add Repository Secrets
-Go to: GitHub Repository → Settings → Secrets and variables → Actions
-
-| Secret Name | Value | Example |
-|-------------|-------|---------|
-| `AWS_ACCESS_KEY_ID` | Your AWS access key | `AKIA...` |
-| `AWS_SECRET_ACCESS_KEY` | Your AWS secret key | `wJalrXUt...` |
-| `AWS_REGION` | AWS region | `us-east-1` |
-| `EKS_CLUSTER_NAME` | EKS cluster name | `mern-cluster` |
-| `EMAIL_USERNAME` | Gmail address | `your-email@gmail.com` |
-| `EMAIL_PASSWORD` | Gmail app password | `abcd efgh ijkl mnop` |
-| `NOTIFICATION_EMAIL` | Email for notifications | `alerts@unconvensionalweb.com` |
-
-#### Setup Gmail App Password
-```bash
-# 1. Enable 2-Factor Authentication on Gmail
-# 2. Go to: Google Account → Security → 2-Step Verification → App passwords
-# 3. Generate password for "Mail"
-# 4. Use this 16-character password as EMAIL_PASSWORD
-```
-
-#### Trigger Deployment
-```bash
-git add .
-git commit -m "Deploy to production"
+# Add AWS credentials to GitHub Repository → Settings → Secrets
+# Then push to trigger auto-deployment
 git push origin main
-# Check GitHub Actions tab for deployment status
 ```
 
-### 5. Domain Configuration
+### 4. Domain Setup
 
-#### Request SSL Certificate
+#### Update Name Servers
 ```bash
-# AWS Console → Certificate Manager → Request certificate
-# Domain: unconvensionalweb.com
-# Add: api.unconvensionalweb.com
-# Validation: DNS validation
-# Copy certificate ARN
-```
-
-#### Update DNS Records
-```bash
-# Get load balancer DNS
-kubectl get ingress -n mern-app
-
-# Add DNS records in your domain provider:
-# CNAME: unconvensionalweb.com → k8s-mernapp-xxxxx.us-east-1.elb.amazonaws.com
-# CNAME: api.unconvensionalweb.com → k8s-mernapp-xxxxx.us-east-1.elb.amazonaws.com
-```
-
-#### Configure Ingress
-```bash
-# Edit k8s/ingress.yaml
-# Replace ACCOUNT_ID and CERTIFICATE_ID with your values
-# Apply changes
-kubectl apply -f k8s/ingress.yaml
+# After deployment, update your domain registrar:
+# Point unconvensionalweb.com to AWS name servers from terraform output
 ```
 
 ## 🔧 Management Commands
