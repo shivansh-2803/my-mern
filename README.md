@@ -241,10 +241,63 @@ You'll receive emails for:
 
 ## 🌐 Access Your Application
 
-### URLs
-- **Frontend**: https://unconvensionalweb.com
-- **Backend API**: https://api.unconvensionalweb.com
-- **Health Check**: https://api.unconvensionalweb.com/record
+### Get Load Balancer URL
+```bash
+# Get the load balancer DNS name
+kubectl get svc frontend -n mern-app
+
+# Copy the EXTERNAL-IP (load balancer DNS)
+# Example: a1b2c3d4e5f6-123456789.us-east-1.elb.amazonaws.com
+```
+
+### Access via Load Balancer
+```bash
+# Open in browser:
+http://YOUR_LOAD_BALANCER_DNS
+
+# Example:
+http://a1b2c3d4e5f6-123456789.us-east-1.elb.amazonaws.com
+```
+
+### Setup Custom Domain (GoDaddy)
+
+#### Step 1: Get AWS Name Servers
+```bash
+# Get Route 53 name servers
+terraform output route53_name_servers
+
+# Copy all 4 name servers, example:
+# ns-123.awsdns-12.com
+# ns-456.awsdns-45.net
+# ns-789.awsdns-78.org
+# ns-012.awsdns-01.co.uk
+```
+
+#### Step 2: Update GoDaddy DNS
+1. **Login to GoDaddy** → My Products → DNS
+2. **Find your domain** → unconvensionalweb.com → Manage DNS
+3. **Change Nameservers:**
+   - Click "Change" next to Nameservers
+   - Select "I'll use my own nameservers"
+   - **Paste the 4 AWS nameservers** from terraform output
+   - Click "Save"
+
+#### Step 3: Wait and Access
+```bash
+# Wait 5-10 minutes for DNS propagation
+# Then access your domain:
+https://unconvensionalweb.com
+https://api.unconvensionalweb.com
+```
+
+### Alternative: Direct IP Access
+```bash
+# If using EC2 instance instead of EKS:
+http://YOUR_EC2_PUBLIC_IP:5173
+
+# Get EC2 IP:
+terraform output instance_public_ip
+```
 
 ### Local Testing
 ```bash

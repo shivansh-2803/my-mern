@@ -25,7 +25,12 @@ spec:
           limits:
             memory: "256Mi"
             cpu: "500m"
-        # No persistent storage for Fargate - data will be ephemeral
+        volumeMounts:
+        - name: mongodb-storage
+          mountPath: /data/db
+      volumes:
+      - name: mongodb-storage
+        emptyDir: {}
 ---
 apiVersion: v1
 kind: Service

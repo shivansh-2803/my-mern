@@ -11,6 +11,13 @@ provider "aws" {
   region = "us-east-1"
 }
 
+# Random string for unique naming
+resource "random_string" "suffix" {
+  length  = 8
+  special = false
+  upper   = false
+}
+
 # VPC
 resource "aws_vpc" "main" {
   cidr_block           = "10.0.0.0/16"
@@ -40,6 +47,17 @@ resource "aws_subnet" "public" {
 
   tags = {
     Name = "mern-public-subnet"
+  }
+}
+
+# Private Subnet
+resource "aws_subnet" "private" {
+  vpc_id            = aws_vpc.main.id
+  cidr_block        = "10.0.2.0/24"
+  availability_zone = "us-east-1b"
+
+  tags = {
+    Name = "mern-private-subnet"
   }
 }
 
@@ -103,7 +121,7 @@ resource "aws_security_group" "web" {
   }
 }
 
-# EC2 Instance (t2.micro - free tier)
+# EC2 Instance
 resource "aws_instance" "web" {
   ami                    = "ami-0866a3c8686eaeeba" # Ubuntu 22.04 LTS
   instance_type          = "t2.micro"
@@ -149,20 +167,149 @@ resource "aws_instance" "web" {
 # Key Pair
 resource "aws_key_pair" "deployer" {
   key_name   = "mern-key"
-  public_key = file("~/.ssh/id_ed25519.pub") # You need to generate this
+  public_key = file("~/.ssh/id_ed25519.pub")
 }
 
+# EKS Cluster
+resource "aws_eks_cluster" "mern_cluster" {
+  name     = "mern-cluster"
+  role_arn = aws_iam_role.eks_cluster.arn
+  version  = "1.28"
 
+  vpc_config {
+    subnet_ids = [aws_subnet.public.id, aws_subnet.private.id]
+  }
 
-# S3 Bucket (free tier includes 5GB)
+  depends_on = [
+    aws_iam_role_policy_attachment.eks_cluster_policy,
+  ]
+}
+
+# EKS Node Group
+resource "aws_eks_node_group" "mern_nodes" {
+  cluster_name    = aws_eks_cluster.mern_cluster.name
+  node_group_name = "mern-nodes"
+  node_role_arn   = aws_iam_role.eks_node.arn
+  subnet_ids      = [aws_subnet.public.id]
+
+  scaling_config {
+    desired_size = 1
+    max_size     = 2
+    min_size     = 1
+  }
+
+  instance_types = ["t3.small"]
+
+  depends_on = [
+    aws_iam_role_policy_attachment.eks_worker_node_policy,
+    aws_iam_role_policy_attachment.eks_cni_policy,
+    aws_iam_role_policy_attachment.eks_container_registry_policy,
+  ]
+}
+
+# EKS Cluster IAM Role
+resource "aws_iam_role" "eks_cluster" {
+  name = "eks-cluster-role-${random_string.suffix.result}"
+
+  assume_role_policy = jsonencode({
+    Statement = [{
+      Action = "sts:AssumeRole"
+      Effect = "Allow"
+      Principal = {
+        Service = "eks.amazonaws.com"
+      }
+    }]
+    Version = "2012-10-17"
+  })
+}
+
+resource "aws_iam_role_policy_attachment" "eks_cluster_policy" {
+  policy_arn = "arn:aws:iam::aws:policy/AmazonEKSClusterPolicy"
+  role       = aws_iam_role.eks_cluster.name
+}
+
+# EKS Node Group IAM Role
+resource "aws_iam_role" "eks_node" {
+  name = "eks-node-role-${random_string.suffix.result}"
+
+  assume_role_policy = jsonencode({
+    Statement = [{
+      Action = "sts:AssumeRole"
+      Effect = "Allow"
+      Principal = {
+        Service = "ec2.amazonaws.com"
+      }
+    }]
+    Version = "2012-10-17"
+  })
+}
+
+resource "aws_iam_role_policy_attachment" "eks_worker_node_policy" {
+  policy_arn = "arn:aws:iam::aws:policy/AmazonEKSWorkerNodePolicy"
+  role       = aws_iam_role.eks_node.name
+}
+
+resource "aws_iam_role_policy_attachment" "eks_cni_policy" {
+  policy_arn = "arn:aws:iam::aws:policy/AmazonEKS_CNI_Policy"
+  role       = aws_iam_role.eks_node.name
+}
+
+resource "aws_iam_role_policy_attachment" "eks_container_registry_policy" {
+  policy_arn = "arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly"
+  role       = aws_iam_role.eks_node.name
+}
+
+# Route 53 Hosted Zone
+resource "aws_route53_zone" "main" {
+  name = "unconvensionalweb.com"
+
+  tags = {
+    Name = "mern-app-zone"
+  }
+}
+
+# SSL Certificate
+resource "aws_acm_certificate" "ssl_cert" {
+  domain_name               = "unconvensionalweb.com"
+  subject_alternative_names = ["*.unconvensionalweb.com"]
+  validation_method         = "DNS"
+
+  lifecycle {
+    create_before_destroy = true
+  }
+
+  tags = {
+    Name = "mern-ssl-cert"
+  }
+}
+
+# Certificate validation records
+resource "aws_route53_record" "cert_validation" {
+  for_each = {
+    for dvo in aws_acm_certificate.ssl_cert.domain_validation_options : dvo.domain_name => {
+      name   = dvo.resource_record_name
+      record = dvo.resource_record_value
+      type   = dvo.resource_record_type
+    }
+  }
+
+  allow_overwrite = true
+  name            = each.value.name
+  records         = [each.value.record]
+  ttl             = 60
+  type            = each.value.type
+  zone_id         = aws_route53_zone.main.zone_id
+}
+
+# Certificate validation
+resource "aws_acm_certificate_validation" "ssl_cert" {
+  certificate_arn         = aws_acm_certificate.ssl_cert.arn
+  validation_record_fqdns = [for record in aws_route53_record.cert_validation : record.fqdn]
+}
+
+# S3 Bucket
 resource "aws_s3_bucket" "static" {
-  bucket = "mern-static-${random_string.bucket_suffix.result}"
-}
-
-resource "random_string" "bucket_suffix" {
-  length  = 8
-  special = false
-  upper   = false
+  bucket = "mern-static-${random_string.suffix.result}"
 }
 
 resource "aws_s3_bucket_public_access_block" "static" {
@@ -187,8 +334,6 @@ output "instance_public_ip" {
   value = aws_instance.web.public_ip
 }
 
-
-
 output "s3_bucket_name" {
   value = aws_s3_bucket.static.bucket
 }
@@ -196,4 +341,23 @@ output "s3_bucket_name" {
 output "s3_website_url" {
   value = aws_s3_bucket_website_configuration.static.website_endpoint
 }
-#
+
+output "eks_cluster_endpoint" {
+  value = aws_eks_cluster.mern_cluster.endpoint
+}
+
+output "eks_cluster_name" {
+  value = aws_eks_cluster.mern_cluster.name
+}
+
+output "route53_zone_id" {
+  value = aws_route53_zone.main.zone_id
+}
+
+output "route53_name_servers" {
+  value = aws_route53_zone.main.name_servers
+}
+
+output "ssl_certificate_arn" {
+  value = aws_acm_certificate.ssl_cert.arn
+}
