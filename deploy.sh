@@ -39,7 +39,7 @@ kubectl create deployment mongodb --image=mongo:7.0 -n mern-app
 kubectl create deployment backend --image=node:18-alpine -n mern-app
 kubectl create deployment frontend --image=nginx:alpine -n mern-app
 
-# Configure backend to run your app
+# Configure backend to run your app with better error handling
 kubectl patch deployment backend -n mern-app -p '{
   "spec": {
     "template": {
@@ -48,29 +48,35 @@ kubectl patch deployment backend -n mern-app -p '{
           "name": "node",
           "image": "node:18-alpine",
           "command": ["/bin/sh", "-c"],
-          "args": ["npm init -y && npm install express cors && echo \"const express = require(\\\"express\\\"); const cors = require(\\\"cors\\\"); const app = express(); app.use(cors()); app.get(\\\"/\\\", (req, res) => res.json({message: \\\"MERN Backend Running\\\"})); app.get(\\\"/api/health\\\", (req, res) => res.json({status: \\\"OK\\\"})); app.listen(5050, () => console.log(\\\"Server running on port 5050\\\"));\" > server.js && node server.js"],
+          "args": ["npm init -y && npm install express cors mongoose && echo \"const express = require('express'); const cors = require('cors'); const app = express(); app.use(cors()); app.use(express.json()); app.get('/', (req, res) => res.json({message: 'MERN Backend Running', status: 'OK'})); app.get('/api/health', (req, res) => res.json({status: 'OK', mongodb: process.env.MONGODB_URI})); app.get('/api/employees', (req, res) => res.json([{name: 'John Doe', position: 'Developer'}])); const PORT = process.env.PORT || 5050; app.listen(PORT, '0.0.0.0', () => console.log('Server running on port ' + PORT));\" > server.js && node server.js"],
           "ports": [{"containerPort": 5050}],
-          "env": [{"name": "MONGODB_URI", "value": "mongodb://mongodb:27017"}, {"name": "PORT", "value": "5050"}]
+          "env": [{"name": "MONGODB_URI", "value": "mongodb://mongodb:27017/mern"}, {"name": "PORT", "value": "5050"}],
+          "resources": {"requests": {"memory": "128Mi", "cpu": "100m"}, "limits": {"memory": "256Mi", "cpu": "200m"}}
         }]
       }
     }
   }
 }'
 
-# Configure frontend with simple React app
+# Configure frontend with React app
 kubectl patch deployment frontend -n mern-app -p '{
   "spec": {
     "template": {
       "spec": {
         "containers": [{
           "name": "nginx",
-          "image": "nginx:alpine",
-          "ports": [{"containerPort": 80}]
+          "image": "node:18-alpine",
+          "command": ["/bin/sh", "-c"],
+          "args": ["npx create-react-app frontend --template typescript && cd frontend && echo \"import React from 'react'; function App() { return (<div style={{padding: '20px', textAlign: 'center'}}><h1>MERN Frontend</h1><p>React app running on LoadBalancer</p><button onClick={() => fetch('/api/health').then(r => r.json()).then(d => alert(JSON.stringify(d)))}>Test Backend</button></div>); } export default App;\" > src/App.tsx && npm start"],
+          "ports": [{"containerPort": 3000}]
         }]
       }
     }
   }
 }'
+
+# Update frontend service to use port 3000
+kubectl patch svc frontend -n mern-app -p '{"spec":{"ports":[{"port":80,"targetPort":3000}]}}'
 
 # Create services
 kubectl expose deployment mongodb --port=27017 --target-port=27017 -n mern-app
