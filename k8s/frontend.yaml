@@ -4,7 +4,7 @@ metadata:
   name: frontend
   namespace: mern-app
 spec:
-  replicas: 2
+  replicas: 1
   selector:
     matchLabels:
       app: frontend
@@ -15,7 +15,8 @@ spec:
     spec:
       containers:
       - name: frontend
-        image: nginx:alpine
+        image: mern-frontend:latest
+        imagePullPolicy: Never
         ports:
         - containerPort: 5173
         resources:
@@ -32,6 +33,7 @@ metadata:
   name: frontend
   namespace: mern-app
 spec:
+  type: LoadBalancer
   selector:
     app: frontend
   ports:

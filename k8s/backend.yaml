@@ -4,7 +4,7 @@ metadata:
   name: backend
   namespace: mern-app
 spec:
-  replicas: 2
+  replicas: 1
   selector:
     matchLabels:
       app: backend
@@ -15,9 +15,8 @@ spec:
     spec:
       containers:
       - name: backend
-        image: node:18-alpine
-        command: ["/bin/sh"]
-        args: ["-c", "while true; do echo 'Backend running'; sleep 30; done"]
+        image: mern-backend:latest
+        imagePullPolicy: Never
         ports:
         - containerPort: 5050
         env:
