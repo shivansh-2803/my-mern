@@ -4,7 +4,7 @@ resource "aws_eks_fargate_profile" "mern_fargate" {
   fargate_profile_name   = "mern-fargate"
   pod_execution_role_arn = aws_iam_role.fargate_pod_execution.arn
 
-  subnet_ids = [aws_subnet.private.id]
+  subnet_ids = [aws_subnet.private.id, aws_subnet.public.id]
 
   selector {
     namespace = "mern-app"
